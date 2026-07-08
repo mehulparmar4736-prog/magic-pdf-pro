@@ -393,9 +393,20 @@ JSON format:
 
   if (!res.ok) throw new Error('API call failed: ' + res.status);
   const data = await res.json();
-  const raw = data.content[0].text || '';
+  
+  // Handle both response formats
+  let raw = '';
+  if (data.content && data.content[0] && data.content[0].text) {
+    raw = data.content[0].text;
+  } else if (data.text) {
+    raw = data.text;
+  } else if (typeof data === 'string') {
+    raw = data;
+  }
+  
+  if (!raw) throw new Error('No JSON returned from AI');
+  
   const cleaned = raw.replace(/```json|```/g, '').trim();
-
   const jsonStart = cleaned.indexOf('{');
   const jsonEnd = cleaned.lastIndexOf('}');
   if (jsonStart === -1) throw new Error('No JSON returned from AI');
