@@ -394,14 +394,11 @@ JSON format:
   if (!res.ok) throw new Error('API call failed: ' + res.status);
   const data = await res.json();
   
-  // Handle both response formats
   let raw = '';
   if (data.content && data.content[0] && data.content[0].text) {
     raw = data.content[0].text;
   } else if (data.text) {
     raw = data.text;
-  } else if (typeof data === 'string') {
-    raw = data;
   }
   
   if (!raw) throw new Error('No JSON returned from AI');
@@ -410,22 +407,31 @@ JSON format:
   const jsonStart = cleaned.indexOf('{');
   const jsonEnd = cleaned.lastIndexOf('}');
   if (jsonStart === -1) throw new Error('No JSON returned from AI');
-  return JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+  
+  try {
+    return JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+  } catch(e) {
+    throw new Error('JSON parse error: ' + e.message);
+  }
 }
 
 // ─── Image fetching (PARALLEL for speed) ─────────────────────────────────────
 async function fetchImages(content) {
-  const queries = [
-    content.sections[0]?.imageQuery || content.correctedTitle,
-    content.sections[1]?.imageQuery || content.correctedTitle,
-    content.sections[2]?.imageQuery || content.correctedTitle,
-    content.correctedTitle,
-  ];
-  // Fetch all images at the same time (parallel) — much faster than one-by-one
-  const results = await Promise.all(
-    queries.map((q, i) => loadImageAsBase64(q, i))
-  );
-  return results;
+  try {
+    const queries = [
+      (content.sections && content.sections[0]?.imageQuery) || content.correctedTitle || 'nature',
+      (content.sections && content.sections[1]?.imageQuery) || content.correctedTitle || 'science',
+      (content.sections && content.sections[2]?.imageQuery) || content.correctedTitle || 'technology',
+      content.correctedTitle || 'document',
+    ];
+    // Fetch all images at the same time (parallel)
+    const results = await Promise.allSettled(
+      queries.map((q, i) => loadImageAsBase64(q, i))
+    );
+    return results.map(r => r.status === 'fulfilled' ? r.value : null);
+  } catch(e) {
+    return [null, null, null, null];
+  }
 }
 
 async function loadImageAsBase64(query, seed) {
@@ -530,7 +536,7 @@ async function buildPDF(content, images) {
     sy = drawSectionHeading(doc, sec.title.toUpperCase(), sy, M, CW, PURPLE);
 
     // Image (right column, doesn't take full page — max ~60mm tall)
-    const img = images[i] || images[0];
+    const img = (images && images.length > i && images[i]) ? images[i] : (images && images.length > 0) ? images[0] : null;
     const imgH = 58;
     const imgW = CW * 0.45;
     const imgX = W - M - imgW;
@@ -713,3 +719,4 @@ function hideError() {
 </script>
 </body>
 </html>
+
