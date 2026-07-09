@@ -7,13 +7,31 @@ export default async function handler(req, res) {
   try {
     const { topic } = req.body;
     
+    const prompt = `You are a document writer. Topic: "${topic}"
+    
+Return ONLY a JSON object with exactly these fields:
+{
+  "correctedTitle": "corrected topic title",
+  "subtitle": "subtitle",
+  "introduction": "250+ word introduction",
+  "sections": [
+    {"title": "title1", "content": "200+ words", "imageQuery": "keyword"},
+    {"title": "title2", "content": "200+ words", "imageQuery": "keyword"},
+    {"title": "title3", "content": "200+ words", "imageQuery": "keyword"},
+    {"title": "title4", "content": "200+ words", "imageQuery": "keyword"},
+    {"title": "title5", "content": "200+ words", "imageQuery": "keyword"}
+  ],
+  "keyFacts": ["fact1","fact2","fact3","fact4","fact5","fact6"],
+  "conclusion": "150+ word conclusion"
+}`;
+
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: topic }] }],
+          contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
             maxOutputTokens: 8192,
@@ -24,18 +42,15 @@ export default async function handler(req, res) {
     );
 
     const data = await response.json();
-    console.log('Gemini response:', JSON.stringify(data).substring(0, 200));
     
     if (!data.candidates || !data.candidates[0]) {
-      console.log('No candidates:', JSON.stringify(data));
-      return res.status(200).json({ content: [{ text: '{}' }] });
+      return res.status(500).json({ error: 'No response from Gemini' });
     }
     
     const text = data.candidates[0].content.parts[0].text || '{}';
     res.status(200).json({ content: [{ text }] });
     
   } catch(err) {
-    console.log('Error:', err.message);
     res.status(500).json({ error: err.message });
   }
-      }
+        }
