@@ -14,21 +14,28 @@ export default async function handler(req, res) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: topic }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 4000 }
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 8192,
+            responseMimeType: "application/json"
+          }
         })
       }
     );
 
     const data = await response.json();
+    console.log('Gemini response:', JSON.stringify(data).substring(0, 200));
     
     if (!data.candidates || !data.candidates[0]) {
-      return res.status(200).json({ content: [{ text: '' }] });
+      console.log('No candidates:', JSON.stringify(data));
+      return res.status(200).json({ content: [{ text: '{}' }] });
     }
     
-    const text = data.candidates[0].content.parts[0].text || '';
+    const text = data.candidates[0].content.parts[0].text || '{}';
     res.status(200).json({ content: [{ text }] });
     
   } catch(err) {
+    console.log('Error:', err.message);
     res.status(500).json({ error: err.message });
   }
-                                                                                                      }
+      }
