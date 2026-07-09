@@ -8,13 +8,19 @@ export default async function handler(req, res) {
     const { topic } = req.body;
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      'https://openrouter.ai/api/v1/chat/completions',
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'HTTP-Referer': 'https://magic-pdf-pro.vercel.app',
+          'X-Title': 'Magic PDF Pro'
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: topic }] }],
-          generationConfig: { temperature: 0.7, maxOutputTokens: 8192 }
+          model: 'google/gemini-2.0-flash-exp:free',
+          messages: [{ role: 'user', content: topic }],
+          max_tokens: 8192
         })
       }
     );
@@ -22,13 +28,13 @@ export default async function handler(req, res) {
     const data = await response.json();
     
     if (data.error) {
-      return res.status(429).json({ error: data.error.message });
+      return res.status(500).json({ error: data.error.message });
     }
     
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    const text = data.choices?.[0]?.message?.content || '{}';
     res.status(200).json({ content: [{ text }] });
     
   } catch(err) {
     res.status(500).json({ error: err.message });
   }
-}
+          }
