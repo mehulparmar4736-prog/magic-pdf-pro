@@ -18,7 +18,7 @@ export default async function handler(req, res) {
           'X-Title': 'Magic PDF Pro'
         },
         body: JSON.stringify({
-          model: 'google/gemini-2.0-flash-exp:free',
+          model: 'meta-llama/llama-3.1-8b-instruct:free',
           messages: [{ role: 'user', content: topic }],
           max_tokens: 8192
         })
@@ -26,6 +26,7 @@ export default async function handler(req, res) {
     );
 
     const data = await response.json();
+    console.log('OpenRouter response:', JSON.stringify(data).substring(0, 300));
     
     if (data.error) {
       return res.status(500).json({ error: data.error.message });
@@ -35,6 +36,7 @@ export default async function handler(req, res) {
     res.status(200).json({ content: [{ text }] });
     
   } catch(err) {
+    console.log('Error:', err.message);
     res.status(500).json({ error: err.message });
   }
-        }
+          }
