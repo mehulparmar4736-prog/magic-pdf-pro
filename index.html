@@ -435,25 +435,29 @@ async function fetchImages(content) {
 }
 
 async function loadImageAsBase64(query, seed) {
-  // Try Unsplash first (topic-specific images)
-  try {
-    const url = `https://source.unsplash.com/700x350/?${encodeURIComponent(query)}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error();
-    const blob = await res.blob();
-    return await blobToBase64(blob);
-  } catch {
-    // Fallback to picsum
+  // Use multiple sources for topic-specific images
+  const cleanQuery = encodeURIComponent(query.toLowerCase().trim());
+  
+  const sources = [
+    // Unsplash source (topic specific)
+    `https://source.unsplash.com/featured/700x350/?${cleanQuery}`,
+    // Picsum with topic seed (fallback)
+    `https://picsum.photos/seed/${cleanQuery}${seed}/700/350`,
+  ];
+
+  for (const url of sources) {
     try {
-      const url2 = `https://picsum.photos/seed/${encodeURIComponent(query + seed)}/700/350`;
-      const res2 = await fetch(url2);
-      if (!res2.ok) throw new Error();
-      const blob2 = await res2.blob();
-      return await blobToBase64(blob2);
-    } catch {
-      return null;
-    }
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      if (blob.size < 1000) continue; // skip tiny/broken images
+      return await blobToBase64(blob);
+    } catch { continue; }
   }
+  return null;
 }
 
 function blobToBase64(blob) {
