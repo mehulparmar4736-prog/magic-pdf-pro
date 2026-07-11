@@ -435,15 +435,24 @@ async function fetchImages(content) {
 }
 
 async function loadImageAsBase64(query, seed) {
-  // Try picsum (reliable CORS)
+  // Try Unsplash first (topic-specific images)
   try {
-    const url = `https://picsum.photos/seed/${encodeURIComponent(query + seed)}/700/350`;
+    const url = `https://source.unsplash.com/700x350/?${encodeURIComponent(query)}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error();
     const blob = await res.blob();
     return await blobToBase64(blob);
   } catch {
-    return null;
+    // Fallback to picsum
+    try {
+      const url2 = `https://picsum.photos/seed/${encodeURIComponent(query + seed)}/700/350`;
+      const res2 = await fetch(url2);
+      if (!res2.ok) throw new Error();
+      const blob2 = await res2.blob();
+      return await blobToBase64(blob2);
+    } catch {
+      return null;
+    }
   }
 }
 
@@ -535,29 +544,27 @@ async function buildPDF(content, images) {
     // Section heading
     sy = drawSectionHeading(doc, sec.title.toUpperCase(), sy, M, CW, PURPLE);
 
-    // Image (right column, doesn't take full page — max ~60mm tall)
+    // Image FULL WIDTH at top (stack layout)
     const img = (images && images.length > i && images[i]) ? images[i] : (images && images.length > 0) ? images[0] : null;
-    const imgH = 58;
-    const imgW = CW * 0.45;
-    const imgX = W - M - imgW;
+    const imgH = 65;
+    const imgW = CW;
 
     if (img) {
       try {
-        doc.addImage(img, 'JPEG', imgX, sy, imgW, imgH);
-        // Light border
+        doc.addImage(img, 'JPEG', M, sy, imgW, imgH);
         doc.setDrawColor(200, 200, 220);
         doc.setLineWidth(0.3);
-        doc.rect(imgX, sy, imgW, imgH);
-        // Caption
+        doc.rect(M, sy, imgW, imgH);
         doc.setTextColor(...GRAY);
         doc.setFontSize(7.5);
         doc.setFont('helvetica', 'italic');
-        doc.text('Fig: ' + sec.imageQuery, imgX + imgW / 2, sy + imgH + 4, { align: 'center' });
-      } catch {}
+        doc.text('Fig: ' + (sec.imageQuery || sec.title), M + imgW / 2, sy + imgH + 4, { align: 'center' });
+        sy += imgH + 8;
+      } catch { sy += 5; }
     }
 
-    // Text flows in left column
-    const textW = img ? CW * 0.52 : CW;
+    // Text flows FULL WIDTH below image
+    const textW = CW;
     doc.setTextColor(...DARK);
     doc.setFontSize(10.5);
     doc.setFont('helvetica', 'normal');
@@ -594,26 +601,40 @@ async function buildPDF(content, images) {
   // Key facts box
   fy = drawSectionHeading(doc, 'KEY FACTS', fy, M, CW, PURPLE);
 
-  doc.setFillColor(...LIGHT_GRAY);
-  const factsBoxH = content.keyFacts.length * 9 + 10;
-  doc.roundedRect(M, fy, CW, factsBoxH, 3, 3, 'F');
-
-  fy += 6;
+  // Key Facts as cards (2 per row)
+  const cardW = (CW - 6) / 2;
+  const cardH = 22;
+  const icons = ['★', '✦', '◆', '●', '▲', '■'];
+  
   content.keyFacts.forEach((fact, idx) => {
+    const col = idx % 2;
+    const row = Math.floor(idx / 2);
+    const cx = M + col * (cardW + 6);
+    const cy = fy + row * (cardH + 4);
+    
+    // Card background
+    doc.setFillColor(240, 240, 255);
+    doc.roundedRect(cx, cy, cardW, cardH, 3, 3, 'F');
+    
+    // Left accent bar
     doc.setFillColor(...PURPLE);
-    doc.circle(M + 5, fy + 1.5, 2.5, 'F');
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(7);
-    doc.setFont('helvetica', 'bold');
-    doc.text((idx + 1).toString(), M + 5, fy + 2.2, { align: 'center' });
-
-    doc.setTextColor(...DARK);
+    doc.rect(cx, cy, 4, cardH, 'F');
+    
+    // Icon
+    doc.setTextColor(...PURPLE);
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(icons[idx] || '★', cx + 8, cy + 8);
+    
+    // Fact text
+    doc.setTextColor(...DARK);
+    doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    const fl = doc.splitTextToSize(fact, CW - 14);
-    doc.text(fl[0], M + 12, fy + 2);
-    fy += 9;
+    const fl = doc.splitTextToSize(fact, cardW - 14);
+    doc.text(fl.slice(0, 2), cx + 8, cy + 14);
   });
+  
+  fy += Math.ceil(content.keyFacts.length / 2) * (cardH + 4) + 6;
 
   fy += 10;
 
@@ -653,7 +674,7 @@ function addFooter(doc, pageNum, title, W, H, M, PURPLE) {
   doc.setTextColor(130, 130, 160);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('✨ Created by MR. MEHUL  •  ' + title, M, H - 4);
+  doc.text('✨ Magic PDF Pro  •  ' + title, M, H - 4);
   doc.text('Page ' + pageNum, W - M, H - 4, { align: 'right' });
 }
 
@@ -719,4 +740,3 @@ function hideError() {
 </script>
 </body>
 </html>
-
