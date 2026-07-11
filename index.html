@@ -435,29 +435,24 @@ async function fetchImages(content) {
 }
 
 async function loadImageAsBase64(query, seed) {
-  // Use multiple sources for topic-specific images
-  const cleanQuery = encodeURIComponent(query.toLowerCase().trim());
-  
-  const sources = [
-    // Unsplash source (topic specific)
-    `https://source.unsplash.com/featured/700x350/?${cleanQuery}`,
-    // Picsum with topic seed (fallback)
-    `https://picsum.photos/seed/${cleanQuery}${seed}/700/350`,
-  ];
-
-  for (const url of sources) {
+  try {
+    // Use our own Vercel proxy to avoid CORS issues — gets topic-specific images
+    const res = await fetch(`/api/imageproxy?url=${encodeURIComponent(query)}`);
+    if (!res.ok) throw new Error('Proxy failed');
+    const data = await res.json();
+    if (data.data) return data.data;
+    throw new Error('No data');
+  } catch {
+    // Fallback: picsum random image
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const res = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (!res.ok) continue;
-      const blob = await res.blob();
-      if (blob.size < 1000) continue; // skip tiny/broken images
+      const res2 = await fetch(`https://picsum.photos/seed/${seed}/700/350`);
+      if (!res2.ok) throw new Error();
+      const blob = await res2.blob();
       return await blobToBase64(blob);
-    } catch { continue; }
+    } catch {
+      return null;
+    }
   }
-  return null;
 }
 
 function blobToBase64(blob) {
