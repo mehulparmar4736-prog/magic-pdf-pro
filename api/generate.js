@@ -8,17 +8,15 @@ export default async function handler(req, res) {
     const { topic } = req.body;
 
     const response = await fetch(
-      'https://openrouter.ai/api/v1/chat/completions',
+      'https://api.mistral.ai/v1/chat/completions',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          'HTTP-Referer': 'https://magic-pdf-pro.vercel.app',
-          'X-Title': 'Magic PDF Pro'
+          'Authorization': `Bearer ${process.env.MISTRAL_API_KEY}`
         },
         body: JSON.stringify({
-          model: 'meta-llama/llama-3.1-8b-instruct:free',
+          model: 'mistral-small-latest',
           messages: [{ role: 'user', content: topic }],
           max_tokens: 8192
         })
@@ -26,7 +24,6 @@ export default async function handler(req, res) {
     );
 
     const data = await response.json();
-    console.log('OpenRouter response:', JSON.stringify(data).substring(0, 300));
     
     if (data.error) {
       return res.status(500).json({ error: data.error.message });
@@ -36,7 +33,6 @@ export default async function handler(req, res) {
     res.status(200).json({ content: [{ text }] });
     
   } catch(err) {
-    console.log('Error:', err.message);
     res.status(500).json({ error: err.message });
   }
-          }
+                                   }
