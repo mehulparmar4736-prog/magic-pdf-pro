@@ -351,31 +351,7 @@ function setStatus(main, sub) {
 
 // ─── Claude API ───────────────────────────────────────────────────────────────
 async function generateContentViaClaude(topic) {
-  const prompt = `You are a professional document writer. Topic: "${topic}"
-
-STRICT RULES:
-1. Auto-correct ALL spelling mistakes in the topic title.
-2. Each section MUST have minimum 250 words of detailed content.
-3. Introduction MUST be minimum 300 words.
-4. Conclusion MUST be minimum 200 words.
-5. keyFacts must use clean English only - NO special symbols like &%*@#^.
-6. Return ONLY raw valid JSON - no markdown, no backticks.
-
-JSON format:
-{
-  "correctedTitle": "Properly spelled topic title",
-  "subtitle": "Professional subtitle",
-  "introduction": "Minimum 300 words detailed introduction",
-  "sections": [
-    {"title": "Section 1", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
-    {"title": "Section 2", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
-    {"title": "Section 3", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
-    {"title": "Section 4", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
-    {"title": "Section 5", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"}
-  ],
-  "keyFacts": ["Fact 1 clean English", "Fact 2 clean English", "Fact 3 clean English", "Fact 4 clean English", "Fact 5 clean English", "Fact 6 clean English"],
-  "conclusion": "Minimum 200 words strong conclusion"
-}\`;
+  const prompt = "You are a professional document writer. Topic: " + topic + ". RULES: 1. Auto-correct spelling. 2. Each section minimum 250 words. 3. Introduction minimum 300 words. 4. Conclusion minimum 200 words. 5. keyFacts clean English only, NO special symbols. 6. Return ONLY raw valid JSON. JSON format: {correctedTitle: string, subtitle: string, introduction: string (300+ words), sections: [{title: string, content: string (250+ words), imageQuery: string}] (5 sections), keyFacts: [6 strings], conclusion: string (200+ words)}"
 
   const res = await fetch('/api/generate', {
     method: 'POST',
@@ -738,3 +714,4 @@ function hideError() {
 </script>
 </body>
 </html>
+
