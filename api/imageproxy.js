@@ -6,19 +6,22 @@ export default async function handler(req, res) {
   if (!url) return res.status(400).json({ error: 'No URL' });
 
   try {
-    // Unsplash API - topic specific
     const query = encodeURIComponent(url);
-    const unsplashUrl = `https://api.unsplash.com/photos/random?query=${query}&w=700&h=350&fit=crop&client_id=your_access_key`;
+    const pexelsRes = await fetch(
+      `https://api.pexels.com/v1/search?query=${query}&per_page=1&orientation=landscape`,
+      {
+        headers: {
+          'Authorization': process.env.PEXELS_API_KEY
+        }
+      }
+    );
     
-    // Use direct Unsplash source with topic keyword
-    const imageUrl = `https://source.unsplash.com/700x350/?${query}`;
+    const pexelsData = await pexelsRes.json();
+    const imageUrl = pexelsData?.photos?.[0]?.src?.large;
     
-    const imgRes = await fetch(imageUrl, {
-      headers: { 'User-Agent': 'MagicPDFPro/1.0' }
-    });
+    if (!imageUrl) throw new Error('No image found');
     
-    if (!imgRes.ok) throw new Error('Image fetch failed');
-    
+    const imgRes = await fetch(imageUrl);
     const buffer = await imgRes.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
     const mimeType = imgRes.headers.get('content-type') || 'image/jpeg';
@@ -27,6 +30,14 @@ export default async function handler(req, res) {
       data: `data:${mimeType};base64,${base64}` 
     });
   } catch(err) {
-    res.status(500).json({ error: err.message });
+    // Fallback picsum
+    try {
+      const fallback = await fetch(`https://picsum.photos/seed/${encodeURIComponent(url)}/700/350`);
+      const buffer = await fallback.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      res.status(200).json({ data: `data:image/jpeg;base64,${base64}` });
+    } catch {
+      res.status(500).json({ error: 'Failed' });
+    }
   }
-        }
+  }
