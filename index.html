@@ -351,39 +351,31 @@ function setStatus(main, sub) {
 
 // ─── Claude API ───────────────────────────────────────────────────────────────
 async function generateContentViaClaude(topic) {
-  const prompt = `You are an expert document writer. The user's topic is: "${topic}"
+  const prompt = `You are a professional document writer. Topic: "${topic}"
 
-IMPORTANT:
-1. First auto-correct any spelling mistakes in the topic.
-2. Write a comprehensive, informative 6-page PDF document in English.
-3. Return ONLY raw valid JSON — no markdown, no backticks, no extra text.
+STRICT RULES:
+1. Auto-correct ALL spelling mistakes in the topic title.
+2. Each section MUST have minimum 250 words of detailed content.
+3. Introduction MUST be minimum 300 words.
+4. Conclusion MUST be minimum 200 words.
+5. keyFacts must use clean English only - NO special symbols like &%*@#^.
+6. Return ONLY raw valid JSON - no markdown, no backticks.
 
 JSON format:
 {
-  "correctedTitle": "Properly spelled and formatted topic title",
-  "subtitle": "One descriptive subtitle line",
-  "introduction": "A detailed introduction of at least 250 words covering background, importance, and overview.",
+  "correctedTitle": "Properly spelled topic title",
+  "subtitle": "Professional subtitle",
+  "introduction": "Minimum 300 words detailed introduction",
   "sections": [
-    {
-      "title": "Section heading",
-      "content": "At least 200 words of detailed, informative content for this section.",
-      "imageQuery": "simple 1-3 word search term for a relevant photo"
-    },
-    { "title": "...", "content": "...", "imageQuery": "..." },
-    { "title": "...", "content": "...", "imageQuery": "..." },
-    { "title": "...", "content": "...", "imageQuery": "..." },
-    { "title": "...", "content": "...", "imageQuery": "..." }
+    {"title": "Section 1", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
+    {"title": "Section 2", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
+    {"title": "Section 3", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
+    {"title": "Section 4", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"},
+    {"title": "Section 5", "content": "Minimum 250 words detailed content", "imageQuery": "relevant keyword"}
   ],
-  "keyFacts": [
-    "Important fact 1 (one sentence)",
-    "Important fact 2",
-    "Important fact 3",
-    "Important fact 4",
-    "Important fact 5",
-    "Important fact 6"
-  ],
-  "conclusion": "A detailed conclusion of at least 150 words summarizing insights and future outlook."
-}`;
+  "keyFacts": ["Fact 1 clean English", "Fact 2 clean English", "Fact 3 clean English", "Fact 4 clean English", "Fact 5 clean English", "Fact 6 clean English"],
+  "conclusion": "Minimum 200 words strong conclusion"
+}\`;
 
   const res = await fetch('/api/generate', {
     method: 'POST',
@@ -418,19 +410,20 @@ JSON format:
 // ─── Image fetching (PARALLEL for speed) ─────────────────────────────────────
 async function fetchImages(content) {
   try {
-    const queries = [
-      (content.sections && content.sections[0]?.imageQuery) || content.correctedTitle || 'nature',
-      (content.sections && content.sections[1]?.imageQuery) || content.correctedTitle || 'science',
-      (content.sections && content.sections[2]?.imageQuery) || content.correctedTitle || 'technology',
-      content.correctedTitle || 'document',
-    ];
-    // Fetch all images at the same time (parallel)
+    // Each section gets its OWN unique image query — no duplicates!
+    const queries = (content.sections || []).map((s, i) => 
+      s.imageQuery || (content.correctedTitle + ' ' + (i + 1)) || 'document'
+    );
+    // Add cover image
+    queries.unshift(content.correctedTitle || 'technology');
+    
+    // Fetch all in parallel with unique queries
     const results = await Promise.allSettled(
-      queries.map((q, i) => loadImageAsBase64(q, i))
+      queries.map((q, i) => loadImageAsBase64(q + ' ' + i, i))
     );
     return results.map(r => r.status === 'fulfilled' ? r.value : null);
   } catch(e) {
-    return [null, null, null, null];
+    return [null, null, null, null, null, null];
   }
 }
 
@@ -511,7 +504,7 @@ async function buildPDF(content, images) {
   doc.setFontSize(10.5);
   doc.setFont('helvetica', 'normal');
   const introLines = doc.splitTextToSize(content.introduction, CW);
-  const page1Lines = introLines.slice(0, 30);
+  const page1Lines = introLines.slice(0, 40);
   doc.text(page1Lines, M, y);
   y += page1Lines.length * 5.5 + 8;
 
@@ -619,18 +612,19 @@ async function buildPDF(content, images) {
     doc.setFillColor(...PURPLE);
     doc.rect(cx, cy, 4, cardH, 'F');
     
-    // Icon
+    // Number instead of special icon (avoids symbol errors)
     doc.setTextColor(...PURPLE);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
-    doc.text(icons[idx] || '★', cx + 8, cy + 8);
+    doc.text((idx + 1).toString(), cx + 8, cy + 9);
     
-    // Fact text
+    // Clean fact text - remove special characters
+    const cleanFact = (fact || '').replace(/[&%*@#^]/g, '').trim();
     doc.setTextColor(...DARK);
     doc.setFontSize(8.5);
     doc.setFont('helvetica', 'normal');
-    const fl = doc.splitTextToSize(fact, cardW - 14);
-    doc.text(fl.slice(0, 2), cx + 8, cy + 14);
+    const fl = doc.splitTextToSize(cleanFact, cardW - 14);
+    doc.text(fl.slice(0, 2), cx + 8, cy + 15);
   });
   
   fy += Math.ceil(content.keyFacts.length / 2) * (cardH + 4) + 6;
@@ -673,7 +667,12 @@ function addFooter(doc, pageNum, title, W, H, M, PURPLE) {
   doc.setTextColor(130, 130, 160);
   doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
-  doc.text('✨ Magic PDF Pro  •  ' + title, M, H - 4);
+  // Only show "Magic PDF Pro | Created by MR. MEHUL" on last page footer
+  if (pageNum === 1) {
+    doc.text('Magic PDF Pro  |  Created by MR. MEHUL', M, H - 4);
+  } else {
+    doc.text('Magic PDF Pro', M, H - 4);
+  }
   doc.text('Page ' + pageNum, W - M, H - 4, { align: 'right' });
 }
 
